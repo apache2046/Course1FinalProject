@@ -25,6 +25,8 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 import controller2d
+import controller2d_purepursuit
+import controller2d_stanley
 import configparser 
 
 # Script level imports
@@ -351,7 +353,9 @@ def exec_waypoint_nav_demo(args):
         #############################################
         # This is where we take the controller2d.py class
         # and apply it to the simulator
-        controller = controller2d.Controller2D(waypoints)
+        # controller = controller2d.Controller2D(waypoints)
+        controller = controller2d_purepursuit.Controller2D(waypoints)
+        # controller = controller2d_stanley.Controller2D(waypoints)
 
         #############################################
         # Determine simulation average timestep (and total frames)
@@ -369,7 +373,7 @@ def exec_waypoint_nav_demo(args):
         sim_start_stamp = measurement_data.game_timestamp / 1000.0
         # Send a control command to proceed to next iteration.
         # This mainly applies for simulations that are in synchronous mode.
-        send_control_command(client, throttle=0.0, steer=0, brake=1.0)
+        send_control_command(client, throttle=0.0, steer=0, brake=0)
         # Computes the average timestep based on several initial iterations
         sim_duration = 0
         for i in range(num_iterations):
