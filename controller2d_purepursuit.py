@@ -166,14 +166,14 @@ class Controller2D(object):
             """
             dv = v - self.vars.v_previous
             v_err = v_desired - v
-            #v_err_d = dv
-            v_err_d = v_err - self.vars.v_err_previous
+            v_err_d = dv
+            #v_err_d = v_err - self.vars.v_err_previous
             self.v_err_i.append(np.clip(v_err, -0.5, 0.5))
             v_err_i = min(8, sum(self.v_err_i))
-            v_err_d = np.clip(v_err_d, -0.05, 0.05)
+            #v_err_d = np.clip(v_err_d, -0.05, 0.05)
             Kp = 0.6
             Ki = 0.01
-            Kd = 1
+            Kd = -1.4
             
             acc_delta = Kp * v_err + Ki * v_err_i  + Kd * v_err_d
             print(f"{acc_delta:.03f}, {Kp * v_err:.03f}, {Ki * v_err_i:.03f}, {Kd * v_err_d:.03f}, {v_err_d:.03f}")
