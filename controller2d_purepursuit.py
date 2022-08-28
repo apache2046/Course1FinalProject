@@ -57,6 +57,7 @@ class Controller2D(object):
         self._desired_speed = desired_speed
 
     def update_waypoints(self, new_waypoints):
+        #print('update_waypoints', new_waypoints[:2], len(new_waypoints))
         self._waypoints = new_waypoints
 
     def get_commands(self):
@@ -176,7 +177,7 @@ class Controller2D(object):
             Kd = -1.4
             
             acc_delta = Kp * v_err + Ki * v_err_i  + Kd * v_err_d
-            print(f"{acc_delta:.03f}, {Kp * v_err:.03f}, {Ki * v_err_i:.03f}, {Kd * v_err_d:.03f}, {v_err_d:.03f}")
+            #print(f"{acc_delta:.03f}, {Kp * v_err:.03f}, {Ki * v_err_i:.03f}, {Kd * v_err_d:.03f}, {v_err_d:.03f}")
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
@@ -198,14 +199,44 @@ class Controller2D(object):
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
             ######################################################
             ######################################################
+            L=3.0
+            rear_center_x = x - np.cos(yaw) * L / 2
+            rear_center_y = y - np.sin(yaw) * L / 2
+            
+            #K_v = 0.4
+            #ld = max(1.5*L, K_v*v)
+            K_v = 0.5
+            ld = max(3*L, K_v*v)
+
+            wpt = np.array(waypoints)
+            wpt[:, 0] -= rear_center_x
+            wpt[:, 1] -= rear_center_y
+            dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2 - ld ** 2)
+            nearest_idx = dist.argmin()
+            #print(nearest_idx)
+            #if nearest_idx == len(waypoints) -1:
+            #    nearest_idx -= 1
+            
+            reference_line_yaw = np.arctan2(waypoints[nearest_idx+1][1] - waypoints[nearest_idx][1] , waypoints[nearest_idx+1][0] - waypoints[nearest_idx][0])
+            #reference_line_yaw = - reference_line_yaw
+            ld_yaw = np.arctan2(waypoints[nearest_idx][1] - rear_center_y, waypoints[nearest_idx][0] - rear_center_x)
+
+            #alpha = reference_line_yaw - ld_yaw
+            alpha = yaw - ld_yaw
+            alpha = -alpha
+
+            steer_delta = np.arctan(2 * L * np.sin(alpha) / (0 + ld)) 
+
+
             """
                 Implement a lateral controller here. Remember that you can
                 access the persistent variables declared above here. For
                 example, can treat self.vars.v_previous like a "global variable".
             """
-            
+            print(f"{x:.05f}, {y:.05f}, {rear_center_x:.05f}, {rear_center_y:.05f}, {waypoints[nearest_idx][0]:.05f}, {waypoints[nearest_idx][1]:.05f}")
             # Change the steer output with the lateral controller. 
-            steer_output    = 0
+            steer_output = steer_delta
+            print(f"steer:, {steer_delta:.05f}, {alpha:.05f}, {ld:.05f}, {ld_yaw:.05f}, {reference_line_yaw:.05f}")
             
             # throttle_output = 0.5
             ######################################################
