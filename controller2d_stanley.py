@@ -6,6 +6,23 @@
 
 import cutils
 import numpy as np
+from collections import deque
+import numpy as np
+
+def get_distance_from_point_to_line(point, line_point1, line_point2):
+    #对于两点坐标为同一点时,返回点与点的距离
+    if line_point1 == line_point2:
+        point_array = np.array(point )
+        point1_array = np.array(line_point1)
+        return np.linalg.norm(point_array -point1_array )
+    #计算直线的三个参数
+    A = line_point2[1] - line_point1[1]
+    B = line_point1[0] - line_point2[0]
+    C = (line_point1[1] - line_point2[1]) * line_point1[0] + \
+        (line_point2[0] - line_point1[0]) * line_point1[1]
+    #根据点到直线的距离公式计算距离
+    distance = (A * point[0] + B * point[1] + C) / np.sqrt(A**2 + B**2)
+    return distance
 
 class Controller2D(object):
     def __init__(self, waypoints):
@@ -25,6 +42,8 @@ class Controller2D(object):
         self._conv_rad_to_steer  = 180.0 / 70.0 / np.pi
         self._pi                 = np.pi
         self._2pi                = 2.0 * np.pi
+
+        self.v_err_i = deque(maxlen = 30)
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
@@ -54,6 +73,7 @@ class Controller2D(object):
         self._desired_speed = desired_speed
 
     def update_waypoints(self, new_waypoints):
+        #print('update_waypoints', new_waypoints[:2], len(new_waypoints))
         self._waypoints = new_waypoints
 
     def get_commands(self):
@@ -114,6 +134,8 @@ class Controller2D(object):
             throttle_output = 0.5 * self.vars.v_previous
         """
         self.vars.create_var('v_previous', 0.0)
+        self.vars.create_var('acc_previous', 0.0)
+        self.vars.create_var('v_err_previous', 0.0)
 
         # Skip the first frame to store previous values properly
         if self._start_control_loop:
@@ -159,28 +181,87 @@ class Controller2D(object):
                 access the persistent variables declared above here. For
                 example, can treat self.vars.v_previous like a "global variable".
             """
+            dv = v - self.vars.v_previous
+            v_err = v_desired - v
+            v_err_d = dv
+            #v_err_d = v_err - self.vars.v_err_previous
+            self.v_err_i.append(np.clip(v_err, -0.5, 0.5))
+            v_err_i = min(8, sum(self.v_err_i))
+            #v_err_d = np.clip(v_err_d, -0.05, 0.05)
+            Kp = 0.6
+            Ki = 0.01
+            Kd = -1.4
             
+            acc_delta = Kp * v_err + Ki * v_err_i  + Kd * v_err_d
+            #print(f"{acc_delta:.03f}, {Kp * v_err:.03f}, {Ki * v_err_i:.03f}, {Kd * v_err_d:.03f}, {v_err_d:.03f}")
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
             throttle_output = 0
             brake_output    = 0
+            forward = np.log(v_desired + 1) / 3.6
+
+            #acc = self.vars.acc_previous + acc_delta
+            #acc = np.clip(acc, -1.0, 1.0)
+            acc = forward + acc_delta
+
+            if acc > 0:
+                throttle_output = acc
+            else:
+                brake_output = -acc
 
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
             ######################################################
             ######################################################
+            L=3.0
+            front_center_x = x + np.cos(yaw) * L / 2
+            front_center_y = y + np.sin(yaw) * L / 2
+            
+            #K_v = 0.4
+            #ld = max(1.5*L, K_v*v)
+            K_v = 0.5
+            ld = max(3*L, K_v*v)
+
+            wpt = np.array(waypoints)
+            wpt[:, 0] -= front_center_x
+            wpt[:, 1] -= front_center_y
+            dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2 - ld ** 2)
+            nearest_idx = dist.argmin()
+            # e = ((waypoints[nearest_idx][0] - front_center_x) ** 2 + (waypoints[nearest_idx][1] - front_center_y) ** 2 ) ** 0.5
+            e =get_distance_from_point_to_line([front_center_x, front_center_y], waypoints[nearest_idx], waypoints[nearest_idx+1])
+            print(f"{front_center_x:.05f}, {front_center_y:.05f}, {waypoints[nearest_idx][0]:.05f}, {waypoints[nearest_idx][1]:.05f}")
+            reference_line_yaw = np.arctan2(waypoints[nearest_idx+1][1] - waypoints[nearest_idx][1] , waypoints[nearest_idx+1][0] - waypoints[nearest_idx][0])
+            #reference_line_yaw = - reference_line_yaw
+            # ld_yaw = np.arctan2(waypoints[nearest_idx][1] - rear_center_y, waypoints[nearest_idx][0] - rear_center_x)
+
+            psai = reference_line_yaw - yaw
+            if psai > np.pi:
+                psai -= 2 * np.pi
+            elif psai < -np.pi:
+                psai += 2 * np.pi
+
+            # if psai < 0:
+            #     e = -e
+
+            Ks = 4
+            Ke = 0.5
+            steer_delta = 0.5 * psai + np.arctan2(Ke * e, Ks + v)
+            # steer_delta = np.arctan2(Ke * e, Ks + v)
+
+
             """
                 Implement a lateral controller here. Remember that you can
                 access the persistent variables declared above here. For
                 example, can treat self.vars.v_previous like a "global variable".
             """
-            
             # Change the steer output with the lateral controller. 
-            steer_output    = 0
+            steer_output = steer_delta
+            print(f"steer:, {steer_delta:.05f}, {psai:.05f}, {e:.05f} {reference_line_yaw:.05f}, {Ke * e:.4f}, {Ks + v:.4f}")
+            # e = np.clip(e, -0.4, 0.4)
             
-            throttle_output = 0.5
+            # throttle_output = 0.5
             ######################################################
             # SET CONTROLS OUTPUT
             ######################################################
@@ -199,3 +280,5 @@ class Controller2D(object):
             in the next iteration)
         """
         self.vars.v_previous = v  # Store forward speed to be used in next step
+        self.vars.acc_previous = acc
+        self.vars.v_err_previous = v_err
