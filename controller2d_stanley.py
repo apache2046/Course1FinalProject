@@ -219,8 +219,6 @@ class Controller2D(object):
             front_center_x = x + np.cos(yaw) * L / 2
             front_center_y = y + np.sin(yaw) * L / 2
             
-            #K_v = 0.4
-            #ld = max(1.5*L, K_v*v)
             K_v = 0.5
             ld = max(3*L, K_v*v)
 
@@ -229,27 +227,26 @@ class Controller2D(object):
             wpt[:, 1] -= front_center_y
             dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2 - ld ** 2)
             nearest_idx = dist.argmin()
-            # e = ((waypoints[nearest_idx][0] - front_center_x) ** 2 + (waypoints[nearest_idx][1] - front_center_y) ** 2 ) ** 0.5
-            e =get_distance_from_point_to_line([front_center_x, front_center_y], waypoints[nearest_idx], waypoints[nearest_idx+1])
-            print(f"{front_center_x:.05f}, {front_center_y:.05f}, {waypoints[nearest_idx][0]:.05f}, {waypoints[nearest_idx][1]:.05f}")
-            reference_line_yaw = np.arctan2(waypoints[nearest_idx+1][1] - waypoints[nearest_idx][1] , waypoints[nearest_idx+1][0] - waypoints[nearest_idx][0])
-            #reference_line_yaw = - reference_line_yaw
-            # ld_yaw = np.arctan2(waypoints[nearest_idx][1] - rear_center_y, waypoints[nearest_idx][0] - rear_center_x)
+            if nearest_idx == len(waypoints) -1:
+                nearest_idx -= 1
 
+            ref_point_x, ref_point_y, _ = waypoints[nearest_idx]
+            ref_next_point_x, ref_next_point_y, _ = waypoints[nearest_idx + 1]
+
+            reference_line_yaw = np.arctan2(ref_next_point_y - ref_point_y, ref_next_point_x - ref_point_x)
+
+            cross_track_error = get_distance_from_point_to_line([front_center_x, front_center_y], waypoints[nearest_idx], waypoints[nearest_idx+1])
+
+            #heading error
             psai = reference_line_yaw - yaw
             if psai > np.pi:
                 psai -= 2 * np.pi
             elif psai < -np.pi:
                 psai += 2 * np.pi
 
-            # if psai < 0:
-            #     e = -e
-
             Ks = 4
             Ke = 0.5
-            steer_delta = 0.5 * psai + np.arctan2(Ke * e, Ks + v)
-            # steer_delta = np.arctan2(Ke * e, Ks + v)
-
+            steer_output = 0.5 * psai + np.arctan2(Ke * cross_track_error, Ks + v)
 
             """
                 Implement a lateral controller here. Remember that you can
@@ -257,8 +254,8 @@ class Controller2D(object):
                 example, can treat self.vars.v_previous like a "global variable".
             """
             # Change the steer output with the lateral controller. 
-            steer_output = steer_delta
-            print(f"steer:, {steer_delta:.05f}, {psai:.05f}, {e:.05f} {reference_line_yaw:.05f}, {Ke * e:.4f}, {Ks + v:.4f}")
+            # steer_output = steer_delta
+            # print(f"steer:, {steer_delta:.05f}, {psai:.05f}, {e:.05f} {reference_line_yaw:.05f}, {Ke * e:.4f}, {Ks + v:.4f}")
             # e = np.clip(e, -0.4, 0.4)
             
             # throttle_output = 0.5

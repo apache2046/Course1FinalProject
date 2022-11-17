@@ -27,7 +27,7 @@ class Controller2D(object):
         self._pi                 = np.pi
         self._2pi                = 2.0 * np.pi
 
-        self.v_err_i = deque(maxlen = 30)
+        self.v_err_i = deque(maxlen = 10)
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
@@ -165,30 +165,24 @@ class Controller2D(object):
                 access the persistent variables declared above here. For
                 example, can treat self.vars.v_previous like a "global variable".
             """
-            dv = v - self.vars.v_previous
             v_err = v_desired - v
-            v_err_d = dv
-            #v_err_d = v_err - self.vars.v_err_previous
-            self.v_err_i.append(np.clip(v_err, -0.5, 0.5))
-            v_err_i = min(8, sum(self.v_err_i))
-            #v_err_d = np.clip(v_err_d, -0.05, 0.05)
+            v_err_d = v_err - self.vars.v_err_previous
+
+            # self.v_err_i = deque(maxlen = 10)
+            self.v_err_i.append(np.clip(v_err, -0.1, 0.1))
+            v_err_i = sum(self.v_err_i)
+
             Kp = 0.6
-            Ki = 0.01
-            Kd = -1.4
+            Ki = 0.05
+            Kd = -0.3
             
             acc_delta = Kp * v_err + Ki * v_err_i  + Kd * v_err_d
-            #print(f"{acc_delta:.03f}, {Kp * v_err:.03f}, {Ki * v_err_i:.03f}, {Kd * v_err_d:.03f}, {v_err_d:.03f}")
-            # Change these outputs with the longitudinal controller. Note that
-            # brake_output is optional and is not required to pass the
-            # assignment, as the car will naturally slow down over time.
+
             throttle_output = 0
             brake_output    = 0
-            forward = np.log(v_desired + 1) / 3.6
+            feed_forward = np.log(v_desired + 1) / 3.6
 
-            #acc = self.vars.acc_previous + acc_delta
-            #acc = np.clip(acc, -1.0, 1.0)
-            acc = forward + acc_delta
-
+            acc = feed_forward + acc_delta
             if acc > 0:
                 throttle_output = acc
             else:
@@ -199,12 +193,11 @@ class Controller2D(object):
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
             ######################################################
             ######################################################
+            # Pure Pursuit Control Law
             L=3.0
             rear_center_x = x - np.cos(yaw) * L / 2
             rear_center_y = y - np.sin(yaw) * L / 2
             
-            #K_v = 0.4
-            #ld = max(1.5*L, K_v*v)
             K_v = 0.5
             ld = max(3*L, K_v*v)
 
@@ -213,23 +206,18 @@ class Controller2D(object):
             wpt[:, 1] -= rear_center_y
             dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2 - ld ** 2)
             nearest_idx = dist.argmin()
-            print("G12", nearest_idx, len(waypoints), v)
             if nearest_idx == len(waypoints) -1:
                nearest_idx -= 1
             
-            reference_line_yaw = np.arctan2(waypoints[nearest_idx+1][1] - waypoints[nearest_idx][1] , waypoints[nearest_idx+1][0] - waypoints[nearest_idx][0])
-            #reference_line_yaw = - reference_line_yaw
-            ld_yaw = np.arctan2(waypoints[nearest_idx][1] - rear_center_y, waypoints[nearest_idx][0] - rear_center_x)
+            ref_point_x, ref_point_y, _ = waypoints[nearest_idx]
+            ref_next_point_x, ref_next_point_y, _ = waypoints[nearest_idx + 1]
+            reference_line_yaw = np.arctan2(ref_next_point_y - ref_point_y, ref_next_point_x - ref_point_x)
 
-            #alpha = reference_line_yaw - ld_yaw
-            alpha = yaw - ld_yaw
-            alpha = -alpha
-
-            # steer_delta = np.arctan(2 * L * np.sin(alpha) / (0 + ld))
-            print("G13", alpha, 2 * L * np.sin(alpha) , (1.5 * v))
-            # steer_delta = np.arctan(2 * L * np.sin(alpha) / (1.5 * v))
-            steer_delta = np.arctan(2 * L * np.sin(alpha) / ld) 
-
+            ld_yaw = np.arctan2(ref_point_y - rear_center_y, ref_point_x - rear_center_x)
+            
+            alpha = ld_yaw - yaw
+            
+            steer_delta = np.arctan2(2 * L * np.sin(alpha), ld) 
 
             """
                 Implement a lateral controller here. Remember that you can

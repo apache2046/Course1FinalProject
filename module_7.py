@@ -365,8 +365,8 @@ def exec_waypoint_nav_demo(args):
         # This is where we take the controller2d.py class
         # and apply it to the simulator
         # controller = controller2d.Controller2D(waypoints)
-        controller = controller2d_purepursuit.Controller2D(waypoints)
-        # controller = controller2d_stanley.Controller2D(waypoints)
+        # controller = controller2d_purepursuit.Controller2D(waypoints)
+        controller = controller2d_stanley.Controller2D(waypoints)
         # controller = controller2d_mpc.Controller2D(waypoints)
 
         #############################################
