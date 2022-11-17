@@ -213,9 +213,9 @@ class Controller2D(object):
             wpt[:, 1] -= rear_center_y
             dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2 - ld ** 2)
             nearest_idx = dist.argmin()
-            #print(nearest_idx)
-            #if nearest_idx == len(waypoints) -1:
-            #    nearest_idx -= 1
+            print("G12", nearest_idx, len(waypoints), v)
+            if nearest_idx == len(waypoints) -1:
+               nearest_idx -= 1
             
             reference_line_yaw = np.arctan2(waypoints[nearest_idx+1][1] - waypoints[nearest_idx][1] , waypoints[nearest_idx+1][0] - waypoints[nearest_idx][0])
             #reference_line_yaw = - reference_line_yaw
@@ -225,7 +225,10 @@ class Controller2D(object):
             alpha = yaw - ld_yaw
             alpha = -alpha
 
-            steer_delta = np.arctan(2 * L * np.sin(alpha) / (0 + ld)) 
+            # steer_delta = np.arctan(2 * L * np.sin(alpha) / (0 + ld))
+            print("G13", alpha, 2 * L * np.sin(alpha) , (1.5 * v))
+            # steer_delta = np.arctan(2 * L * np.sin(alpha) / (1.5 * v))
+            steer_delta = np.arctan(2 * L * np.sin(alpha) / ld) 
 
 
             """

@@ -27,7 +27,9 @@ import matplotlib.pyplot as plt
 import controller2d
 import controller2d_purepursuit
 import controller2d_stanley
-import configparser 
+import controller2d_mpc
+import configparser
+import cv2
 
 # Script level imports
 sys.path.append(os.path.abspath(sys.path[0] + '/..'))
@@ -37,6 +39,7 @@ from carla.client     import make_carla_client, VehicleControl
 from carla.settings   import CarlaSettings
 from carla.tcp        import TCPConnectionError
 from carla.controller import utils
+from carla            import image_converter
 
 """
 Configurable params
@@ -70,12 +73,12 @@ WEATHERID = {
 SIMWEATHER = WEATHERID["CLEARNOON"]     # set simulation weather
 
 PLAYER_START_INDEX = 1      # spawn index for player (keep to 1)
-FIGSIZE_X_INCHES   = 8      # x figure size of feedback in inches
-FIGSIZE_Y_INCHES   = 8      # y figure size of feedback in inches
+FIGSIZE_X_INCHES   = 6      # x figure size of feedback in inches
+FIGSIZE_Y_INCHES   = 9      # y figure size of feedback in inches
 PLOT_LEFT          = 0.1    # in fractions of figure width and height
-PLOT_BOT           = 0.1    
-PLOT_WIDTH         = 0.8
-PLOT_HEIGHT        = 0.8
+PLOT_BOT           = 0.05   
+PLOT_WIDTH         = 0.9
+PLOT_HEIGHT        = 0.9
 
 WAYPOINTS_FILENAME = 'racetrack_waypoints.txt'  # waypoint file to load
 DIST_THRESHOLD_TO_LAST_WAYPOINT = 2.0  # some distance from last position before
@@ -112,6 +115,14 @@ def make_carla_settings(args):
         SeedPedestrians=SEED_PEDESTRIANS,
         WeatherId=SIMWEATHER,
         QualityLevel=args.quality_level)
+##############################################################
+    camera0 = sensor.Camera('CameraRGB')
+    camera0.set_image_size(1920, 1080)
+    camera0.set_position(-10.0, 0.0, 6)
+    camera0.set_rotation(-10, 0.0, 0.0)
+    settings.add_sensor(camera0)
+#############################################################
+
     return settings
 
 class Timer(object):
@@ -354,8 +365,9 @@ def exec_waypoint_nav_demo(args):
         # This is where we take the controller2d.py class
         # and apply it to the simulator
         # controller = controller2d.Controller2D(waypoints)
-        # controller = controller2d_purepursuit.Controller2D(waypoints)
-        controller = controller2d_stanley.Controller2D(waypoints)
+        controller = controller2d_purepursuit.Controller2D(waypoints)
+        # controller = controller2d_stanley.Controller2D(waypoints)
+        # controller = controller2d_mpc.Controller2D(waypoints)
 
         #############################################
         # Determine simulation average timestep (and total frames)
@@ -470,26 +482,26 @@ def exec_waypoint_nav_demo(args):
                 lp_1d.plot_new_dynamic_figure(title="Forward Speed (m/s)")
         forward_speed_fig.add_graph("forward_speed", 
                                     label="forward_speed", 
-                                    window_size=TOTAL_EPISODE_FRAMES)
+                                    window_size=300)#TOTAL_EPISODE_FRAMES)
         forward_speed_fig.add_graph("reference_signal", 
                                     label="reference_Signal", 
-                                    window_size=TOTAL_EPISODE_FRAMES)
+                                    window_size=300)#TOTAL_EPISODE_FRAMES)
 
         # Add throttle signals graph
         throttle_fig = lp_1d.plot_new_dynamic_figure(title="Throttle")
         throttle_fig.add_graph("throttle", 
                               label="throttle", 
-                              window_size=TOTAL_EPISODE_FRAMES)
+                              window_size=300)#TOTAL_EPISODE_FRAMES)
         # Add brake signals graph
         brake_fig = lp_1d.plot_new_dynamic_figure(title="Brake")
         brake_fig.add_graph("brake", 
                               label="brake", 
-                              window_size=TOTAL_EPISODE_FRAMES)
+                              window_size=300)#TOTAL_EPISODE_FRAMES)
         # Add steering signals graph
         steer_fig = lp_1d.plot_new_dynamic_figure(title="Steer")
         steer_fig.add_graph("steer", 
                               label="steer", 
-                              window_size=TOTAL_EPISODE_FRAMES)
+                              window_size=300)#TOTAL_EPISODE_FRAMES)
 
         # live plotter is disabled, hide windows
         if not enable_live_plot:
@@ -507,7 +519,6 @@ def exec_waypoint_nav_demo(args):
         for frame in range(TOTAL_EPISODE_FRAMES):
             # Gather current data from the CARLA server
             measurement_data, sensor_data = client.read_data()
-
             # Update pose, timestamp
             current_x, current_y, current_yaw = \
                 get_current_pose(measurement_data)
@@ -639,6 +650,22 @@ def exec_waypoint_nav_demo(args):
                     lp_traj.refresh()
                     lp_1d.refresh()
                     live_plot_timer.lap()
+
+                k = list(lp_traj._fcas.keys())[0]
+                image12 = np.frombuffer(lp_traj._fcas[k].tostring_rgb(), dtype='uint8')
+                image13 = image12.reshape(lp_traj._fcas[k].get_width_height()[::-1] + (3,))[:,:,::-1]
+                cv2.imwrite(f'/tmp/sim2/image{frame:04}.png', image13)
+
+                image24 = []
+                for k in lp_1d._fcas.keys():
+                    image22 = np.frombuffer(lp_1d._fcas[k].tostring_rgb(), dtype='uint8')
+                    image23 = image22.reshape(lp_1d._fcas[k].get_width_height()[::-1] + (3,))[:,:,::-1]
+                    image24.append(image23)
+                image24 = np.vstack(image24)
+                cv2.imwrite(f'/tmp/sim3/image{frame:04}.png', image24)
+
+                main_image = sensor_data.get('CameraRGB', None)
+                cv2.imwrite(f'/tmp/sim/image{frame:04}.png', image_converter.to_bgra_array(main_image)[:,:,:3])
 
             # Output controller command to CARLA server
             send_control_command(client,
