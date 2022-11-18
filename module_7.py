@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import controller2d
 import controller2d_purepursuit
 import controller2d_stanley
-import controller2d_mpc
+#import controller2d_mpc
 import configparser
 import cv2
 

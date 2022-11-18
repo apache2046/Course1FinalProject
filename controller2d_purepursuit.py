@@ -169,12 +169,12 @@ class Controller2D(object):
             v_err_d = v_err - self.vars.v_err_previous
 
             # self.v_err_i = deque(maxlen = 10)
-            self.v_err_i.append(np.clip(v_err, -0.1, 0.1))
+            self.v_err_i.append(np.clip(v_err, -0.2, 0.2))
             v_err_i = sum(self.v_err_i)
 
             Kp = 0.6
-            Ki = 0.05
-            Kd = -0.3
+            Ki = 0.1
+            Kd = +0.3
             
             acc_delta = Kp * v_err + Ki * v_err_i  + Kd * v_err_d
 
