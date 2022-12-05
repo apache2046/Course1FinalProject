@@ -214,12 +214,12 @@ class Controller2D(object):
             front_center_y = y + np.sin(yaw) * L / 2
             
             K_v = 0.5
-            ld = max(3*L, K_v*v)
+            #ld = max(3*L, K_v*v)
 
             wpt = np.array(waypoints)
             wpt[:, 0] -= front_center_x
             wpt[:, 1] -= front_center_y
-            dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2 - ld ** 2)
+            dist = np.abs(wpt[:, 0]**2 + wpt[:, 1] ** 2) # - ld ** 2)
             nearest_idx = dist.argmin()
             if nearest_idx == len(waypoints) -1:
                 nearest_idx -= 1
@@ -238,9 +238,9 @@ class Controller2D(object):
             elif psai < -np.pi:
                 psai += 2 * np.pi
 
-            Ks = 4
-            Ke = 0.5
-            steer_output = 0.5 * psai + np.arctan2(Ke * cross_track_error, Ks + v)
+            Ks = 8
+            Ke = 10
+            steer_output = 1 * psai + np.arctan2(Ke * cross_track_error, Ks + v)
 
             """
                 Implement a lateral controller here. Remember that you can
